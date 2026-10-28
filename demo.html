@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Q-AI Chatbot —— 2API Demo</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #12161f; --panel-2: #171c28; --line: #232a3a;
+    --text: #e8ecf5; --muted: #8b96ad; --accent: #6d5efc; --accent-2: #22d3a6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .badge { font-size: 11px; color: var(--accent-2); border: 1px solid var(--accent-2);
+    padding: 1px 7px; border-radius: 20px; }
+  .status { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .status b { color: var(--accent-2); }
+  main { max-width: 980px; margin: 0 auto; padding: 18px 20px 120px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+  select, input, textarea, button { font: inherit; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; outline: none; }
+  select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+  button { cursor: pointer; background: var(--accent); border-color: transparent; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; border-color: var(--line); font-weight: 400; }
+  .chat { display: flex; flex-direction: column; gap: 12px; }
+  .msg { padding: 11px 14px; border-radius: 12px; max-width: 86%; white-space: pre-wrap;
+    word-break: break-word; border: 1px solid var(--line); }
+  .msg.user { align-self: flex-end; background: #1d2440; border-color: #2f3a63; }
+  .msg.bot { align-self: flex-start; background: var(--panel); }
+  .msg .meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .composer { position: fixed; bottom: 0; left: 0; right: 0; padding: 14px 20px;
+    background: linear-gradient(to top, var(--bg) 60%, transparent); }
+  .composer-inner { max-width: 980px; margin: 0 auto; display: flex; gap: 10px; }
+  .composer textarea { flex: 1; resize: none; height: 52px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .card img { width: 100%; display: block; }
+  .card .cap { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { padding: 6px 14px; border-radius: 20px; cursor: pointer; border: 1px solid var(--line);
+    background: transparent; font-size: 13px; }
+  .tab.active { background: var(--accent); border-color: transparent; }
+  .hidden { display: none !important; }
+  .stat { font-size: 12px; color: var(--muted); }
+  .warn { font-size: 12px; color: #f0b429; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Q-AI Chatbot Assistant v1.8.2 → OpenAI 兼容网关</h1>
+  <span class="badge">2API DEMO</span>
+  <span class="status">上游 <b id="upstream">-</b> · 运行 <span id="uptime">-</span></span>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab active" data-tab="chat">对话</button>
+    <button class="tab" data-tab="image">文生图</button>
+    <button class="tab" data-tab="info">接口说明</button>
+  </div>
+
+  <section id="tab-chat">
+    <div class="row">
+      <label class="stat">模型</label>
+      <select id="model">
+        <option value="qai-qwen2.5-7b">qai-qwen2.5-7b（hub，上游固定 qwen2.5:7b）</option>
+        <option value="qai-qwen2.5-1.5b">qai-qwen2.5-1.5b（Ollama 直通，更快）</option>
+      </select>
+      <label class="stat"><input type="checkbox" id="stream" checked /> 流式</label>
+      <button class="ghost" id="clear">清空</button>
+      <span class="stat" id="chatstat"></span>
+    </div>
+    <div class="chat" id="chat"></div>
+  </section>
+
+  <section id="tab-image" class="hidden">
+    <div class="row">
+      <input id="imgprompt" style="flex:1;min-width:260px" placeholder="描述要生成的图片，例如：一只橘猫的特写，柔和光" />
+      <select id="pipeline">
+        <option value="text">/v1/images/text（CloudFront）</option>
+        <option value="replicate">/v1/images/generate（Replicate）</option>
+      </select>
+      <button id="genimg">生成</button>
+    </div>
+    <div class="stat" id="imgstat"></div>
+    <div class="grid" id="images" style="margin-top:12px"></div>
+  </section>
+
+  <section id="tab-info" class="hidden">
+    <div class="msg bot" style="max-width:100%">
+      <div class="meta">本地网关已暴露的 OpenAI 兼容接口</div>
+GET  /health
+GET  /v1/models
+POST /v1/chat/completions      {"model":"qai-qwen2.5-7b","messages":[...],"stream":false}
+POST /v1/images/generations    {"prompt":"...","response_format":"url|b64_json","pipeline":"text|replicate"}
+    </div>
+    <div class="msg bot" style="max-width:100%;margin-top:12px">
+      <div class="meta">已验证的上游协议</div>
+POST https://grok.api.solidtechapps.com/v1/chat/completions   Authorization: Bearer &lt;APK内硬编码TOKEN&gt;
+     → 始终 SSE，模型被固定为 qwen2.5:7b，请求里的 model 被忽略
+POST /v1/qwen/chat       → Ollama /api/chat 直通，可选模型仅 qwen2.5:7b / qwen2.5:1.5b
+POST /v1/qwen/generate   → Ollama /api/generate 直通
+POST /v1/images/text     → {"image_url":"https://d2pjqnz3em56tc.cloudfront.net/qai/&lt;ts&gt;.png"} 1024×1024
+POST /v1/images/generate → [{"url":"https://replicate.delivery/..."}] 1024×1024
+      <div class="warn" style="margin-top:8px">凭证来自 APK 内的 .env，属第三方服务静态密钥，仅限研究用途。</div>
+    </div>
+  </section>
+</main>
+
+<div class="composer">
+  <div class="composer-inner">
+    <textarea id="input" placeholder="输入消息，Enter 发送 / Shift+Enter 换行"></textarea>
+    <button id="send">发送</button>
+  </div>
+</div>
+
+<script>
+const state = { messages: [], busy: false };
+const $ = (id) => document.getElementById(id);
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+  ['chat', 'image', 'info'].forEach(name => $('tab-' + name).classList.toggle('hidden', name !== t.dataset.tab));
+}));
+
+async function refreshHealth() {
+  try {
+    const r = await fetch('/health');
+    const j = await r.json();
+    $('upstream').textContent = new URL(j.upstream).host;
+    $('uptime').textContent = j.uptime_s + 's';
+  } catch (e) {
+    $('upstream').textContent = '不可达';
+  }
+}
+refreshHealth();
+setInterval(refreshHealth, 15000);
+
+function addMsg(role, text, meta) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  const head = document.createElement('div');
+  head.className = 'meta';
+  head.textContent = meta || (role === 'user' ? '我' : 'Q-AI');
+  const body = document.createElement('div');
+  body.textContent = text;
+  div.append(head, body);
+  $('chat').appendChild(div);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  return body;
+}
+
+async function send() {
+  const input = $('input');
+  const text = input.value.trim();
+  if (!text || state.busy) return;
+  input.value = '';
+  state.busy = true; $('send').disabled = true;
+  state.messages.push({ role: 'user', content: text });
+  addMsg('user', text);
+
+  const bubble = addMsg('assistant', '', 'Q-AI · 生成中');
+  const t0 = performance.now();
+  const wantStream = $('stream').checked;
+  let acc = '';
+
+  try {
+    const r = await fetch('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: $('model').value, messages: state.messages, stream: wantStream }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({ error: { message: r.statusText } }));
+      throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+    }
+    if (wantStream) {
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith('data:')) continue;
+          const payload = line.slice(5).trim();
+          if (payload === '[DONE]') continue;
+          let j; try { j = JSON.parse(payload); } catch (e) { continue; }
+          if (j.error) throw new Error(j.error.message);
+          const delta = j.choices && j.choices[0] && j.choices[0].delta;
+          if (delta && delta.content) { acc += delta.content; bubble.textContent = acc; }
+        }
+      }
+    } else {
+      const j = await r.json();
+      acc = j.choices[0].message.content;
+      bubble.textContent = acc;
+    }
+    const ms = Math.round(performance.now() - t0);
+    state.messages.push({ role: 'assistant', content: acc });
+    bubble.parentElement.querySelector('.meta').textContent = 'Q-AI · ' + ms + 'ms · ' + acc.length + ' 字';
+    $('chatstat').textContent = '本轮 ' + ms + 'ms';
+  } catch (e) {
+    bubble.textContent = '❌ ' + e.message;
+  } finally {
+    state.busy = false; $('send').disabled = false; input.focus();
+  }
+}
+
+$('send').onclick = send;
+$('input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$('clear').onclick = () => { state.messages = []; $('chat').innerHTML = ''; $('chatstat').textContent = ''; };
+
+$('genimg').onclick = async () => {
+  const prompt = $('imgprompt').value.trim();
+  if (!prompt) return;
+  $('genimg').disabled = true;
+  $('imgstat').textContent = '生成中…（上游约 3-5s）';
+  const t0 = performance.now();
+  try {
+    const r = await fetch('/v1/images/generations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, pipeline: $('pipeline').value }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+    const url = j.data[0].url;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<img src="' + url + '" alt="" /><div class="cap"></div>';
+    card.querySelector('.cap').textContent = prompt + ' · ' + Math.round(performance.now() - t0) + 'ms';
+    $('images').prepend(card);
+    $('imgstat').textContent = '完成 · ' + Math.round(performance.now() - t0) + 'ms';
+  } catch (e) {
+    $('imgstat').textContent = '❌ ' + e.message;
+  } finally {
+    $('genimg').disabled = false;
+  }
+};
+$('imgprompt').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('genimg').click(); });
+</script>
+</body>
+</html>

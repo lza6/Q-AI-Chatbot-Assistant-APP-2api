@@ -1,0 +1,16 @@
+# credentials
+.env.local
+.env
+
+# reverse-engineering inputs (never publish the APK or extracted natives)
+*.apk
+*.so
+apk_out/
+AndroidManifest.xml
+
+# local noise
+__pycache__/
+*.pyc
+*.log
+shots/*.png.tmp
+strings.txt
