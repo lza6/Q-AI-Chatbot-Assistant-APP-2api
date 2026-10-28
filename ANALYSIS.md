@@ -26,10 +26,10 @@
 ```
 BASE_URL='https://grok.api.solidtechapps.com/'
 TOKEN='<46 字符静态 API Key，已脱敏>'
-SECRET='s@k-p2p@grook:1'            # 已探测：当前鉴权链路未使用
+SECRET='<已脱敏>'                    # 已探测：当前鉴权链路未使用
 SERDA_BASE_URL='https://ai.sora.solidtechapps.com'
-SERDA_AUTH_TOKEN='eyJhbGciOiJIUzI1NiIs…'   # 独立 JWT，非本 App 聊天链路
-AB_TESTING_URL / AB_TESTING_BODY_ENCRYPTION_KEY='Q94jTYTk|Jq3Z7h8'
+SERDA_AUTH_TOKEN='<HS256 JWT，已脱敏>'      # 独立 JWT，非本 App 聊天链路
+AB_TESTING_URL / AB_TESTING_BODY_ENCRYPTION_KEY='<已脱敏>'
 FIREBASE_* / REVENUECAT(google,apple) / ADJUST / BUGSNAG / FACEBOOK_APP_ID
 APPLE_WEB_CLIENT_ID='com.suponoholdings.grokchat.client'
 ```
