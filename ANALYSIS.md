@@ -86,11 +86,27 @@ Authorization: Bearer <TOKEN>      # "Bearer " 大小写敏感，"bearer xxx" �
 | 流式真伪 | 真流式：609 字 / 333 个 chunk / 首包 5.32 s、跨度 5.26 s | ✅已验证 |
 | 计费字段 | 响应无 `usage`，本网关用 `len/4` 估算并标 `estimated:true` | 合理推断 |
 
-### 2.4 Ollama 直通通道
+### 2.4 Ollama 直通通道与模型清单
 
 `/v1/qwen/chat` 把 body 原样转给上游 Ollama，**错误也原样透传**：`model:"llama3"` → `{"error":"model 'llama3' not found"}`。
 
-模型枚举（13 个候选）：**只有 `qwen2.5:7b`、`qwen2.5:1.5b` 存在**，其余全 not found ✅已验证 → 上游是一台自建 Ollama，不是 Grok、也不是外部 API 聚合。
+44 个候选名实测（`models_scan.py`），**只存活 3 个**：
+
+| 模型 | 类型 | 能力 | 取证 |
+|------|------|------|------|
+| `qwen2.5:7b` | 文本 | hub 通道固定使用它；纯文本对话 | ✅已验证 |
+| `qwen2.5:1.5b` | 文本 | 更小更快，直通可指定 | ✅已验证 |
+| **`qwen2.5vl:7b`** | **多模态（视觉）** | **能读图**：红/蓝图识别正确，赛博朋克猫图描述为"戴着耳机、眼睛发出粉色光芒的猫" | ✅已验证 |
+
+对照实验：同一张图发给 `qwen2.5:7b` → `{"error":"Multimodal data provided, but model does not support multimodal requests."}`，
+证明 vl 是独立部署的多模态模型，不是文本模型的幻觉 ✅已验证。
+
+不存在的：`qwen2.5:3b/0.5b/14b/32b`、`qwen2.5-coder:*`、`qwen3:*`、`llama3.x/4`、`gemma2/3`、`mistral/mixtral`、`phi3/3.5/4`、
+`deepseek-r1:*`、`llava`、`moondream`、`nomic-embed-text`、`grok`/`grok-3`/`grok-4`、`gpt-4o`/`gpt-3.5-turbo` —— 全部 `model not found`。
+
+**视觉通道的工程约束**：图片必须以 Ollama 原生格式 `messages[].images=[base64]` 提交（不是 OpenAI 的 `image_url`）；
+且 Express 默认 body 上限 **100 KB**，base64 膨胀 4/3 → **原始图片须 < ≈75 KB**，203 KB 的 PNG 直接 `413 Payload Too Large` ✅已验证。
+
 
 ### 2.5 文生图
 

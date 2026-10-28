@@ -19,6 +19,8 @@
 | `test_demo.py` | 功能回归（非流式 / 流式 / 1.5b / 两条图片管线 / b64_json / 错误路径） |
 | `browser_test.py` | Playwright 真实浏览器验证（截图落 `shots/`） |
 | `probe.py` `deep.py` `deep2.py` `charac.py` `route_scan.py` | 上游摸底脚本（限速探测、参数行为、路由爆破、并发饱和曲线） |
+| `models_scan.py` | 模型枚举：44 个候选名实测，确认上游只有 3 个模型 |
+| `vision_test.py` | `qwen2.5vl:7b` 视觉能力验证（含不支持多模态的对照实验） |
 | `ANALYSIS.md` | 逆向分析报告（静态 + 动态 + 协议 + 基建指纹） |
 | `NEW-API-INTEGRATION.md` | 接入 new-api 的三种方案与计费建议 |
 
@@ -59,6 +61,8 @@ cp .env.local.example .env.local   # 填入 TOKEN 后再启动
 ## 已验证状态（2026-10-28/29，本机实测）
 
 - 功能：`test_demo.py` 7/7 通过（含流式首字 2.4s、b64_json 1.7MB）
+- 模型：`models_scan.py` 44 候选 → 存活 `qwen2.5:7b` / `qwen2.5:1.5b` / `qwen2.5vl:7b`（其余全 not found）
+- 视觉：`vision_test.py` → 红/蓝图识别正确 + 图片描述准确，文本模型同图报 `does not support multimodal`
 - 压测：`stress.py` 50 请求 @10 并发 → 50/50 成功、0 失败、p50 15.8s（上游排队）；20 流式 @10 并发 → 20/20；5 图 @5 并发 → 5/5
 - 浏览器：`browser_test.py` → `BROWSER_OK`，两轮对话上下文保持、图片 `naturalWidth=1024`、无 console error
 - 截图：`shots/01_home.png` `02_chat.png` `02b_chat_turn2.png` `03_image.png` `04_info.png`
